@@ -1,0 +1,2 @@
+go to college
+make it able to do basic data clean
