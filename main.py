@@ -20,8 +20,8 @@ import re
 import sounddevice as sd
 import vosk
 import queue
-from threading import Thread
 import pandas as pd
+from threading import Thread
 genai.configure(api_key= user_config.genai_api)
 
 engine = pyttsx3.init()
@@ -67,6 +67,79 @@ def get_gemini_response(prompt):
     model = genai.GenerativeModel("gemini-pro")
     response = model.generate_content(prompt)
     return response.text
+
+def clean_data(file_path):
+    try:
+        df = pd.read_csv(file_path, delimiter=',', on_bad_lines='skip')
+        
+        speak("I have loaded the dataset. Do you want to proceed with data cleaning? Say yes or no.")
+        confirmation = command().lower()
+        
+        if "yes" not in confirmation:
+            speak("Data cleaning canceled.")
+            return
+        
+        speak("Starting the data cleaning process.")
+        
+        # Step 1: Remove duplicate rows
+        df.drop_duplicates(inplace=True)
+        speak("Duplicate rows removed.")
+        
+        # Step 2: Handle missing values
+        df.fillna(method='ffill', inplace=True)  # Forward fill missing values
+        df.fillna(method='bfill', inplace=True)  # Backward fill remaining missing values
+        speak("Missing values handled Successfully.")
+        
+        # Step 3: Remove columns with excessive missing values
+        threshold = 0.6 * len(df)  # If more than 60% missing, drop column
+        df.dropna(thresh=threshold, axis=1, inplace=True)
+        speak("Columns with excessive missing values removed.")
+        
+        # Step 4: Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_").str.replace("[^a-zA-Z0-9_]", "")
+        speak("Column names standardized.")
+        
+        # Step 5: Convert categorical variables to lowercase
+        for col in df.select_dtypes(include=['object']).columns:
+            df[col] = df[col].str.lower().str.strip()
+        speak("Categorical variables converted to lowercase.")
+        
+        # Step 6: Remove outliers using z-score method
+        from scipy.stats import zscore
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        df = df[(df[numeric_cols].apply(zscore) < 3).all(axis=1)]
+        speak("Outliers removed using z-score method.")
+        
+        # Step 7: Convert date columns to datetime format
+        for col in df.columns:
+            try:
+                df[col] = pd.to_datetime(df[col])
+            except Exception:
+                pass  # Ignore non-date columns
+        speak("Date columns converted to datetime format.")
+        
+        # Step 8: Normalize numerical data
+        for col in numeric_cols:
+            df[col] = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
+        speak("Numerical data normalized.")
+        
+        # Step 9: Encode categorical variables
+        df = pd.get_dummies(df, drop_first=True)
+        speak("Categorical variables encoded.")
+        
+        # Step 10: Save the cleaned dataset
+        cleaned_file_path = file_path.replace(".csv", "_cleaned.csv")
+        df.to_csv(cleaned_file_path, index=False)
+        
+        speak(f"Data cleaning complete. The cleaned file is saved as {cleaned_file_path}")
+        print(f"Data cleaning complete. The cleaned file is saved as {cleaned_file_path}")
+    
+    except FileNotFoundError:
+        speak("File not found. Please check the file name and try again.")
+    except Exception as e:
+        speak("An error occurred while cleaning the data.")
+        print(f"Error: {e}")
+
 
 def speak(audio):
     engine.say(audio)
@@ -241,6 +314,7 @@ def main_process():
             
         elif "send whatsapp message" in request:
             speak("Please say the phone number with country code.")
+            request = request.replace("plus", " + ")
             phone_number = command().replace(" ", "")  # Capture number from voice
 
             speak("What message would you like to send?")
@@ -262,14 +336,6 @@ def main_process():
         #     speak("What is the content of the email?")
         #     content = command()
         #     pwk.send_mail("dhruvin1309@gmail.com", user_config.gmail_pass, subject, content | MIMEText, receiver_email)
-        # elif "ask ai" in request:
-        #     request = request.replace("jarvis","")
-        #     request = request.replace("ask ai ","")
-        #     print(request)
-        #     response = ai.send_request(request)
-        #     print(response)
-        #     speak(response)
-            
         elif "calculate" in request:
             operations = {
                 'plus': operator.add,
@@ -321,9 +387,14 @@ def main_process():
             except Exception as e:
                 speak("There was an error with the calculation.")  
                 print(f"❌ Error: {e}")  
-
-
-  
+                
+        elif "clean data" in request:
+            speak("Please say the CSV file name without extension.")
+            file_name = command().strip().replace(" ", "")
+            file_path = os.path.join(os.getcwd(), f"{file_name}.csv")
+            print(file_path)
+            clean_data(file_path)
+            
         elif "tell me news" in request:
             bbc_url = 'http://feeds.bbci.co.uk/news/rss.xml'
             try:
@@ -354,3 +425,6 @@ def main_process():
 
 if __name__ == "__main__":
     listen_hotword()
+from os import path
+file_path = path.join(os.getcwd(), "hello", ".csv")
+print(file_path)
