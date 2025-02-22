@@ -31,6 +31,7 @@ import emoji
 import pyperclip
 from langdetect import detect
 from threading import Thread
+import subprocess
 genai.configure(api_key= user_config.genai_api)
 
 engine = pyttsx3.init()
@@ -300,6 +301,60 @@ def send_whatsapp_message(message):
     except pyautogui.FailSafeException:
         print("PyAutoGUI Failsafe triggered. Exiting.")
         speak("Failsafe triggered. Please move your mouse to the top-left corner to stop.")
+        
+def run_project():
+    # Run the Python application
+    subprocess.Popen(['python', 'app.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+    
+    # Navigate to image-editor/src and run npm start
+    subprocess.Popen(['cmd.exe', '/K', 'cd image-editor/src && npm start'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+    
+def upload_image():
+    speak("Please provide the file name without extension.")
+    file_name = command().strip().replace("", "") # Assuming 'command()' gets user input
+    file_path = os.path.join(os.getcwd(), f"{file_name}.png")
+
+    if os.path.exists(file_path):
+
+        # ... Code to make sure the window is active and in focus ... 
+
+        x = 460
+        y = 225
+        x1 = 606
+        y1 = 860
+        pyautogui.click(x, y)
+        time.sleep(3)  # Give time for the file dialog to open
+        pyautogui.click(x1, y1)
+        pyautogui.write(file_path)
+        pyautogui.press('enter')
+
+
+        speak("Image uploaded successfully.")
+    else:
+        speak("File not found.")
+def detect_object():
+    x = 630
+    y = 233
+    pyautogui.click(x, y)
+    time.sleep(20)
+    speak("Object detected successfully.")
+    speak("tell me which object you want to Extract?")
+    object_name = command().strip()
+    if "first" in object_name:
+        pyautogui.click(473, 354)
+    elif "second" in object_name:
+        pyautogui.click(620, 354)
+    elif "third" in object_name:
+        pyautogui.click(756, 354)
+    elif "fourth" in object_name:
+        pyautogui.click(895, 354)
+    elif "fifth" in object_name:    
+        pyautogui.click(1026, 354)
+    elif "sixth" in object_name:
+        pyautogui.click(1160, 354)
+    else:
+        speak("Sorry, I couldn't find the object.")
+    speak("Image Extraction Started.")
 def speak(audio):
     engine.say(audio)
     engine.runAndWait()
@@ -427,7 +482,13 @@ def main_process():
 
             except FileNotFoundError:
                 speak("Task file not found. Please add tasks first.")
-                
+        elif "run project" in request:
+            speak("Sure sir! I will run your project.")
+            run_project()
+        elif "upload image" in request:
+            upload_image()
+        elif "detect object" in request:
+            detect_object()
         elif "open" in request:
             query = request.replace("open","")
             pyautogui.press("super")
